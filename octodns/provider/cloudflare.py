@@ -61,7 +61,7 @@ class CloudflareProvider(BaseProvider):
     SUPPORTS_GEO = False
     SUPPORTS_DYNAMIC = False
     SUPPORTS = set(('ALIAS', 'A', 'AAAA', 'CAA', 'CNAME', 'MX', 'NS', 'SRV',
-                    'SPF', 'TXT'))
+                    'SPF', 'SSHFP', 'TLSA', 'TXT'))
 
     MIN_TTL = 120
     TIMEOUT = 15
@@ -187,6 +187,20 @@ class CloudflareProvider(BaseProvider):
             'values': ['{}.'.format(r['content']) for r in records],
         }
 
+    def _data_for_SSHFP(self, _type, records):
+        values = []
+        for r in records:
+            values.append({
+                'algorithm': r['data']['algorithm'],
+                'fingerprint': r['data']['fingerprint'],
+                'fingerprint_type': r['data']['type'],
+            })
+        return {
+            'type': _type,
+            'ttl': records[0]['ttl'],
+            'values': values
+        }
+
     def _data_for_SRV(self, _type, records):
         values = []
         for r in records:
@@ -195,6 +209,21 @@ class CloudflareProvider(BaseProvider):
                 'weight': r['data']['weight'],
                 'port': r['data']['port'],
                 'target': '{}.'.format(r['data']['target']),
+            })
+        return {
+            'type': _type,
+            'ttl': records[0]['ttl'],
+            'values': values
+        }
+
+    def _data_for_TLSA(self, _type, records):
+        values = []
+        for r in records:
+            values.append({
+                'usage': r['data']['usage'],
+                'selector': r['data']['selector'],
+                'matching_type': r['data']['matching_type'],
+                'certificate': r['data']['certificate'],
             })
         return {
             'type': _type,
@@ -339,6 +368,16 @@ class CloudflareProvider(BaseProvider):
                 'content': value.exchange
             }
 
+    def _contents_for_SSHFP(self, record):
+        for value in record.values:
+            yield {
+                'data': {
+                    'algorithm': value.algorithm,
+                    'fingerprint': value.fingerprint,
+                    'type': value.fingerprint_type,
+                }
+            }
+
     def _contents_for_SRV(self, record):
         try:
             service, proto, subdomain = record.name.split('.', 2)
@@ -362,6 +401,17 @@ class CloudflareProvider(BaseProvider):
                     'weight': value.weight,
                     'port': value.port,
                     'target': value.target[:-1],
+                }
+            }
+
+    def _contents_for_TLSA(self, record):
+        for value in record.values:
+            yield {
+                'data': {
+                    'usage': value.usage,
+                    'selector': value.selector,
+                    'matching_type': value.matching_type,
+                    'certificate': value.certificate,
                 }
             }
 
@@ -416,6 +466,13 @@ class CloudflareProvider(BaseProvider):
         elif _type == 'SRV':
             data = data['data']
             return '{port} {priority} {target} {weight}'.format(**data)
+        elif _type == 'SSHFP':
+            data = data['data']
+            return '{algorithm} {type} {fingerprint}'.format(**data)
+        elif _type == 'TLSA':
+            data = data['data']
+            data_format = '{usage} {selector} {matching_type} {certificate}'
+            return data_format.format(**data)
         return data['content']
 
     def _apply_Create(self, change):

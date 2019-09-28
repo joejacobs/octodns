@@ -92,6 +92,7 @@ class Record(object):
                 'SPF': SpfRecord,
                 'SRV': SrvRecord,
                 'SSHFP': SshfpRecord,
+                'TLSA': TlsaRecord,
                 'TXT': TxtRecord,
             }[_type]
         except KeyError:
@@ -1063,6 +1064,89 @@ class SshfpValue(object):
 class SshfpRecord(_ValuesMixin, Record):
     _type = 'SSHFP'
     _value_type = SshfpValue
+
+
+class TlsaValue(object):
+    VALID_USAGE = (0, 1, 2, 3)
+    VALID_SELECTOR = (0, 1)
+    VALID_MATCHING_TYPE = (0, 1, 2)
+
+    @classmethod
+    def validate(cls, data, _type):
+        if not isinstance(data, (list, tuple)):
+            data = (data,)
+        reasons = []
+        for value in data:
+            try:
+                usage = int(value['usage'])
+                if usage not in cls.VALID_USAGE:
+                    reasons.append('unrecognized usage "{}"'
+                                   .format(usage))
+            except KeyError:
+                reasons.append('missing usage')
+            except ValueError:
+                reasons.append('invalid usage "{}"'
+                               .format(value['usage']))
+            try:
+                selector = int(value['selector'])
+                if selector not in cls.VALID_SELECTOR:
+                    reasons.append('unrecognized selector "{}"'
+                                   .format(selector))
+            except KeyError:
+                reasons.append('missing selector')
+            except ValueError:
+                reasons.append('invalid selector "{}"'
+                               .format(value['selector']))
+            try:
+                matching_type = int(value['matching_type'])
+                if matching_type not in cls.VALID_MATCHING_TYPE:
+                    reasons.append('unrecognized matching_type "{}"'
+                                   .format(matching_type))
+            except KeyError:
+                reasons.append('missing matching_type')
+            except ValueError:
+                reasons.append('invalid matching_type "{}"'
+                               .format(value['matching_type']))
+            if 'certificate' not in value:
+                reasons.append('missing certificate')
+        return reasons
+
+    @classmethod
+    def process(cls, values):
+        return [TlsaValue(v) for v in values]
+
+    def __init__(self, value):
+        self.usage = int(value['usage'])
+        self.selector = int(value['selector'])
+        self.matching_type = int(value['matching_type'])
+        self.certificate = value['certificate']
+
+    @property
+    def data(self):
+        return {
+            'usage': self.usage,
+            'selector': self.selector,
+            'matching_type': self.matching_type,
+            'certificate': self.certificate,
+        }
+
+    def __cmp__(self, other):
+        if self.usage != other.usage:
+            return cmp(self.usage, other.usage)
+        elif self.selector != other.selector:
+            return cmp(self.selector, other.selector)
+        elif self.matching_type != other.matching_type:
+            return cmp(self.matching_type, other.matching_type)
+        return cmp(self.certificate, other.certificate)
+
+    def __repr__(self):
+        return "'{} {} {} {}'".format(self.usage, self.selector,
+                                      self.matching_type, self.certificate)
+
+
+class TlsaRecord(_ValuesMixin, Record):
+    _type = 'TLSA'
+    _value_type = TlsaValue
 
 
 class _ChunkedValuesMixin(_ValuesMixin):

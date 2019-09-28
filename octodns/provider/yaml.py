@@ -33,7 +33,7 @@ class YamlProvider(BaseProvider):
     SUPPORTS_GEO = True
     SUPPORTS_DYNAMIC = True
     SUPPORTS = set(('A', 'AAAA', 'ALIAS', 'CAA', 'CNAME', 'MX', 'NAPTR', 'NS',
-                    'PTR', 'SSHFP', 'SPF', 'SRV', 'TXT'))
+                    'PTR', 'SSHFP', 'SPF', 'SRV', 'TLSA', 'TXT'))
 
     def __init__(self, id, directory, default_ttl=3600, enforce_order=True,
                  *args, **kwargs):
